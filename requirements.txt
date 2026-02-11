@@ -1,0 +1,8 @@
+flask
+google-adk
+google-cloud-firestore
+google-cloud-storage
+google-cloud-aiplatform
+sendgrid>=6.11.0
+pypdf==4.0.1
+reportlab==4.0.8
