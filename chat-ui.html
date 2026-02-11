@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>AI Procurement Chat</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f4f6f9;
+            display: flex;
+            justify-content: center;
+            margin-top: 60px;
+        }
+
+        .container {
+            width: 500px;
+            background: white;
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+
+        h2 {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        textarea {
+            width: 100%;
+            height: 120px;
+            padding: 10px;
+            margin-bottom: 15px;
+            font-family: monospace;
+            font-size: 14px;
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            background: #1976d2;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-size: 15px;
+            border-radius: 5px;
+        }
+
+        button:hover {
+            background: #125ea8;
+        }
+
+        .message {
+            margin-top: 15px;
+            padding: 12px;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        .success {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        .error {
+            background: #ffebee;
+            color: #c62828;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Vendor Quotation Submission</h2>
+
+    <textarea id="quotationInput">
+SUPPLIER: ABC GLOBAL SOFTWARE RFQ
+UNIT_PRICE: 120000
+DELIVERY_DAYS: 12
+    </textarea>
+
+    <button onclick="submitQuotation()">Submit Quotation</button>
+
+    <div id="responseBox"></div>
+</div>
+
+<script>
+
+async function submitQuotation() {
+    const input = document.getElementById("quotationInput").value;
+    const responseBox = document.getElementById("responseBox");
+
+    responseBox.innerHTML = `
+        <div class="message">Processing quotation...</div>
+    `;
+
+    try {
+        const response = await fetch(
+            "https://us-central1-data-engineering-479617.cloudfunctions.net/simulate_inbound_email",
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    subject: "Quotation for RFQ-TEST-9100",
+                    body: input
+                })
+            }
+        );
+
+        if (!response.ok) {
+            throw new Error("Server error");
+        }
+
+        // We DO NOT display JSON result intentionally
+        responseBox.innerHTML = `
+            <div class="message success">
+                 Quotation submitted successfully.<br>
+                 Stored securely in system (GCS)<br>
+                 Negotiation triggered
+            </div>
+        `;
+
+    } catch (error) {
+        responseBox.innerHTML = `
+            <div class="message error">
+                ❌ System Error: Unable to submit quotation.
+            </div>
+        `;
+    }
+}
+
+</script>
+
+</body>
+</html>
+
