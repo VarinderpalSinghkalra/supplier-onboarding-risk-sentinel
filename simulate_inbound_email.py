@@ -8,21 +8,14 @@ from tools.bq_tool import insert_quotation_into_bq
 # 🔥 RISK SCORING ENGINE
 # ----------------------------------
 def calculate_risk_score(unit_price: float, delivery_days: int) -> int:
-    """
-    Basic procurement risk scoring logic.
-    """
-
     risk = 0
 
-    # High price risk
     if unit_price > 150000:
         risk += 30
 
-    # Suspiciously low price
     if unit_price < 80000:
         risk += 25
 
-    # Delivery delay risk
     if delivery_days > 30:
         risk += 40
     elif delivery_days > 15:
@@ -31,6 +24,9 @@ def calculate_risk_score(unit_price: float, delivery_days: int) -> int:
     return risk
 
 
+# ----------------------------------
+# 🚀 MAIN CLOUD FUNCTION
+# ----------------------------------
 def simulate_inbound_email(request):
 
     # ----------------------------------
@@ -47,9 +43,6 @@ def simulate_inbound_email(request):
             },
         )
 
-    # ----------------------------------
-    # Only POST allowed
-    # ----------------------------------
     if request.method != "POST":
         return (
             {"status": "ERROR", "message": "Only POST allowed"},
@@ -58,23 +51,43 @@ def simulate_inbound_email(request):
         )
 
     try:
-        data = request.get_json(silent=True) or {}
+        subject = ""
+        body = ""
+        sender = ""
 
-        if not data:
+        # ----------------------------------
+        # 🔥 CASE 1 — SENDGRID INBOUND
+        # ----------------------------------
+        if request.form:
+            print("📩 SendGrid Inbound Triggered")
+
+            subject = str(request.form.get("subject", "")).strip()
+            body = str(request.form.get("text", "")).strip()
+            sender = str(request.form.get("from", "")).strip()
+
+        # ----------------------------------
+        # 🔥 CASE 2 — JSON (UI / Postman)
+        # ----------------------------------
+        elif request.is_json:
+            print("📩 JSON UI Triggered")
+
+            data = request.get_json(silent=True) or {}
+            subject = str(data.get("subject", "")).strip()
+            body = str(data.get("body", "")).strip()
+            sender = "UI"
+
+        else:
             return (
-                {"status": "ERROR", "message": "Missing body"},
+                {"status": "ERROR", "message": "Unsupported content type"},
                 400,
                 {"Access-Control-Allow-Origin": "*"},
             )
 
-        subject = str(data.get("subject", "")).strip()
-        body = str(data.get("body", "")).strip()
-
-        print("📩 Incoming Subject:", subject)
-        print("📩 Incoming Body:", body)
+        print("📩 Subject:", subject)
+        print("📩 Body:", body)
 
         # ----------------------------------
-        # Extract RFQ ID
+        # 🔍 Extract RFQ ID
         # ----------------------------------
         rfq_match = re.search(r"(RFQ-[A-Za-z0-9-]+)", subject)
 
@@ -86,10 +99,10 @@ def simulate_inbound_email(request):
             )
 
         rfq_id = rfq_match.group(1).strip()
-        print("📌 Extracted RFQ ID:", rfq_id)
+        print("📌 RFQ ID:", rfq_id)
 
         # ----------------------------------
-        # Extract quotation fields
+        # 🔍 Extract Quotation Fields
         # ----------------------------------
         supplier_match = re.search(r"SUPPLIER:\s*(.+)", body, re.IGNORECASE)
         price_match = re.search(r"UNIT_PRICE:\s*(\d+)", body, re.IGNORECASE)
@@ -111,20 +124,21 @@ def simulate_inbound_email(request):
         print("📌 Delivery Days:", delivery_days)
 
         # ----------------------------------
-        # 🔥 CALCULATE RISK SCORE
+        # 🔥 Calculate Risk Score
         # ----------------------------------
         risk_score = calculate_risk_score(unit_price, delivery_days)
-        print("📊 Calculated Risk Score:", risk_score)
+        print("📊 Risk Score:", risk_score)
 
         # ----------------------------------
-        # 🔥 STORE QUOTATION IN GCS
+        # 🔥 Store in GCS
         # ----------------------------------
         quotation_data = {
             "rfq_id": rfq_id,
             "supplier_name": supplier_name,
             "unit_price": unit_price,
             "delivery_days": delivery_days,
-            "risk_score": risk_score
+            "risk_score": risk_score,
+            "sender": sender
         }
 
         gcs_path = upload_quotation(
@@ -133,10 +147,10 @@ def simulate_inbound_email(request):
             quotation_data=quotation_data
         )
 
-        print("✅ Stored quotation in GCS:", gcs_path)
+        print("✅ Stored in GCS:", gcs_path)
 
         # ----------------------------------
-        # 🔥 INSERT INTO BIGQUERY
+        # 🔥 Insert into BigQuery
         # ----------------------------------
         supplier_id = insert_quotation_into_bq(
             rfq_id=rfq_id,
@@ -148,18 +162,21 @@ def simulate_inbound_email(request):
             risk_score=risk_score
         )
 
-        print("✅ Inserted into BigQuery with supplier_id:", supplier_id)
+        print("✅ Inserted into BigQuery:", supplier_id)
 
         # ----------------------------------
-        # Trigger Negotiation + Email
+        # 🔥 Trigger Negotiation + Email
         # ----------------------------------
         negotiation_result = negotiate_rfq_handler({
             "rfq_id": rfq_id,
             "send_email": True
         })
 
-        print("✅ Negotiation handler response:", negotiation_result)
+        print("✅ Negotiation Result:", negotiation_result)
 
+        # ----------------------------------
+        # ✅ SUCCESS RESPONSE
+        # ----------------------------------
         return (
             {
                 "status": "QUOTE_RECEIVED",
@@ -177,7 +194,7 @@ def simulate_inbound_email(request):
         )
 
     except Exception as e:
-        print("❌ simulate_inbound_email error:", str(e))
+        print("❌ Error:", str(e))
         return (
             {"status": "ERROR", "message": str(e)},
             500,
