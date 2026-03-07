@@ -1,3 +1,14 @@
+curl -X POST https://us-central1-platform-support-analyst-57565.cloudfunctions.net/simulate_inbound_email \
+-H "Content-Type: application/json" \
+-d '{
+"subject":"RFQ-TEST",
+"body":"SUPPLIER: Test Vendor\nUNIT_PRICE: 100000\nDELIVERY_DAYS: 15"
+}'
+
+
+
+
+
 gcloud functions deploy gmail-reader \
 --gen2 \
 --runtime python312 \
