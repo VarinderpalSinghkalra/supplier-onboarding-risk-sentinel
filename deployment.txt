@@ -7,6 +7,15 @@ curl -X POST https://us-central1-platform-support-analyst-57565.cloudfunctions.n
 
 
 
+gcloud functions deploy simulate-inbound-email \
+--gen2 \
+--runtime python312 \
+--region us-central1 \
+--entry-point simulate_inbound_email \
+--trigger-http \
+--allow-unauthenticated
+
+
 
 
 gcloud functions deploy gmail-reader \
