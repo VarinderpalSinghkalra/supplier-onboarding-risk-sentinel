@@ -1,0 +1,15 @@
+gcloud functions deploy gmail-reader \
+--gen2 \
+--runtime python312 \
+--region us-central1 \
+--entry-point process_gmail \
+--trigger-http \
+--allow-unauthenticated
+
+
+
+gcloud scheduler jobs create http gmail-rfq-reader \
+--schedule="*/1 * * * *" \
+--uri="https://us-central1-data-engineering-479617.cloudfunctions.net/gmail-reader" \
+--http-method=GET \
+--location=us-central1
