@@ -1,0 +1,303 @@
+Enabling Inbound Email Processing using SendGrid and GCP
+
+Learning Notes / Implementation Summary
+
+Objective
+
+The goal of this implementation was to enable suppliers to send quotations via email and automatically process those emails in a cloud-native workflow.
+
+The system receives supplier emails, parses the quotation details, stores the information in Google Cloud, and triggers automated negotiation logic.
+
+This allows the procurement process to begin automatically once a supplier sends a quotation email.
+
+⸻
+
+Overall Architecture
+
+The inbound email workflow works as follows:
+
+Supplier Email
+        ↓
+SendGrid Mail Server
+        ↓
+SendGrid Inbound Parse
+        ↓
+Cloud Function Webhook
+        ↓
+Quotation Parsing
+        ↓
+Risk Scoring
+        ↓
+Store in GCS
+        ↓
+Insert into BigQuery
+        ↓
+Negotiation Engine
+
+
+⸻
+
+Step 1 — Domain Setup
+
+To receive inbound emails through SendGrid, a domain was required.
+
+A domain was configured:
+
+supplier-onboard.in
+
+A subdomain was created for inbound email processing:
+
+inbound.supplier-onboard.in
+
+This allows SendGrid to receive emails addressed to:
+
+rfq@inbound.supplier-onboard.in
+
+
+⸻
+
+Step 2 — DNS Configuration
+
+To route emails to SendGrid servers, an MX record was configured in the domain registrar.
+
+DNS configuration:
+
+Type	Host	Value	Priority
+MX	inbound	mx.sendgrid.net	10
+
+Verification was performed using:
+
+dig mx inbound.supplier-onboard.in
+
+Expected result:
+
+inbound.supplier-onboard.in MX 10 mx.sendgrid.net
+
+This confirms that emails sent to the subdomain are routed to SendGrid.
+
+⸻
+
+Step 3 — SendGrid Inbound Parse Setup
+
+SendGrid provides a feature called Inbound Parse, which forwards received emails to a webhook.
+
+Configuration steps:
+	1.	Open SendGrid Dashboard
+	2.	Navigate to:
+
+Settings → Inbound Parse
+
+	3.	Create a new inbound parse entry.
+
+Configuration used:
+
+Receiving Domain:
+
+inbound.supplier-onboard.in
+
+Destination URL:
+
+https://us-central1-platform-support-analyst-57565.cloudfunctions.net/simulate-inbound-email
+
+Options enabled:
+	•	Spam Check
+	•	Send Raw MIME Message
+
+This configuration ensures that every email received by SendGrid is forwarded to the Cloud Function.
+
+⸻
+
+Step 4 — Cloud Function Webhook
+
+A Google Cloud Function was created to receive the inbound email payload.
+
+The function performs the following tasks:
+	1.	Receives HTTP POST request from SendGrid
+	2.	Extracts email metadata
+	3.	Parses supplier quotation information
+	4.	Calculates risk score
+	5.	Stores quotation in GCS
+	6.	Inserts data into BigQuery
+	7.	Triggers negotiation logic
+
+The webhook endpoint:
+
+simulate-inbound-email
+
+Deployment command:
+
+gcloud functions deploy simulate-inbound-email \
+--gen2 \
+--runtime python312 \
+--region us-central1 \
+--entry-point simulate_inbound_email \
+--trigger-http \
+--allow-unauthenticated
+
+
+⸻
+
+Step 5 — Handling SendGrid Payload Format
+
+SendGrid sends email data as form data, not JSON.
+
+Important fields in the payload include:
+
+subject
+from
+to
+text
+html
+email
+attachments
+
+Initially the function only parsed the text field, which caused issues when emails contained HTML content.
+
+The function was updated to support multiple formats:
+
+text
+html
+raw MIME email
+
+This made the email parser more robust.
+
+⸻
+
+Step 6 — Quotation Parsing
+
+Supplier quotation details are extracted from the email body using pattern matching.
+
+Example supplier email:
+
+SUPPLIER: Omega Industrial Pvt Ltd
+UNIT_PRICE: 275000
+DELIVERY_DAYS: 18
+
+Fields extracted:
+	•	Supplier Name
+	•	Unit Price
+	•	Delivery Days
+
+These fields are then used for further processing.
+
+⸻
+
+Step 7 — Risk Scoring Logic
+
+A basic procurement risk scoring model was implemented.
+
+Example rules:
+
+Condition	Risk
+High price (>150000)	+30
+Suspiciously low price	+25
+Delivery > 30 days	+40
+Delivery > 15 days	+20
+
+This score helps determine supplier reliability.
+
+⸻
+
+Step 8 — Storing Email Data in GCS
+
+Each quotation email is stored as a structured object in Google Cloud Storage.
+
+Example path:
+
+gs://supplier-onboarding-risk-sentinel/quotations/RFQ-2026-5002/
+
+This creates a system of record for supplier communications.
+
+⸻
+
+Step 9 — BigQuery Data Ingestion
+
+Parsed quotation details are stored in BigQuery for analytics and procurement evaluation.
+
+Example table:
+
+supplier_quotations
+
+Stored fields include:
+	•	RFQ ID
+	•	Supplier Name
+	•	Unit Price
+	•	Delivery Days
+	•	Risk Score
+	•	GCS document URI
+
+This allows analytical queries and supplier comparisons.
+
+⸻
+
+Step 10 — Negotiation Engine Trigger
+
+Once quotation data is stored, a negotiation engine evaluates supplier options.
+
+The negotiation logic:
+
+Compare suppliers
+Evaluate price
+Consider delivery timelines
+Apply risk score
+Recommend vendor
+
+If sufficient quotes exist, the system sends a recommendation email to procurement.
+
+⸻
+
+Testing the System
+
+Testing was performed by sending an email to:
+
+rfq@inbound.supplier-onboard.in
+
+Example test email:
+
+Subject:
+
+RFQ-2026-5002
+
+Body:
+
+SUPPLIER: Omega Industrial Pvt Ltd
+UNIT_PRICE: 275000
+DELIVERY_DAYS: 18
+
+Logs confirmed the following steps executed successfully:
+
+SendGrid Inbound Triggered
+RFQ ID extracted
+Quotation parsed
+Risk score calculated
+Data stored in GCS
+Record inserted in BigQuery
+Negotiation logic executed
+
+
+⸻
+
+Key Learning Points
+
+Email Infrastructure
+
+Setting up inbound email requires proper DNS configuration using MX records.
+
+SendGrid Webhooks
+
+SendGrid forwards email data as form-encoded HTTP requests, not JSON.
+
+Serverless Integration
+
+Cloud Functions provide an efficient way to process incoming email events without managing infrastructure.
+
+Data Pipeline
+
+Combining GCS and BigQuery allows both raw document storage and structured analytics.
+
+Procurement Automation
+
+Email-driven workflows can automate supplier onboarding and quotation evaluation.
+
+⸻
+
