@@ -59,16 +59,31 @@ def simulate_inbound_email(request):
         # 🔥 CASE 1 — SENDGRID INBOUND
         # ----------------------------------
         if request.form:
+
             print("📩 SendGrid Inbound Triggered")
+            print("📦 SendGrid Keys:", list(request.form.keys()))
 
             subject = str(request.form.get("subject", "")).strip()
-            body = str(request.form.get("text", "")).strip()
             sender = str(request.form.get("from", "")).strip()
+
+            # ----------------------------------
+            # FIX: handle multiple body formats
+            # ----------------------------------
+            body = request.form.get("text")
+
+            if not body:
+                body = request.form.get("html")
+
+            if not body:
+                body = request.form.get("email")
+
+            body = str(body).strip()
 
         # ----------------------------------
         # 🔥 CASE 2 — JSON (UI / Postman)
         # ----------------------------------
         elif request.is_json:
+
             print("📩 JSON UI Triggered")
 
             data = request.get_json(silent=True) or {}
@@ -105,7 +120,7 @@ def simulate_inbound_email(request):
         # 🔍 Extract Quotation Fields
         # ----------------------------------
         supplier_match = re.search(r"SUPPLIER:\s*(.+)", body, re.IGNORECASE)
-        price_match = re.search(r"UNIT_PRICE:\s*(\d+)", body, re.IGNORECASE)
+        price_match = re.search(r"UNIT_PRICE:\s*([\d\.]+)", body, re.IGNORECASE)
         delivery_match = re.search(r"DELIVERY_DAYS:\s*(\d+)", body, re.IGNORECASE)
 
         if not supplier_match or not price_match or not delivery_match:
@@ -194,7 +209,9 @@ def simulate_inbound_email(request):
         )
 
     except Exception as e:
+
         print("❌ Error:", str(e))
+
         return (
             {"status": "ERROR", "message": str(e)},
             500,
