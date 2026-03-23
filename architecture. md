@@ -1,0 +1,174 @@
+Autonomous RFQ Processing and Supplier Onboarding System (GCP)
+
+Overview
+
+This project implements a serverless procurement automation pipeline on Google Cloud Platform. It processes inbound supplier quotations (RFQs), evaluates risk, stores structured data, and enables automated outbound communication using SendGrid.
+
+The system is designed to be scalable, modular, and extensible, with planned support for Document AI-based extraction of supplier onboarding documents such as W-9 forms.
+
+
+
+Architecture
+
+High-Level Flow
+
+Inbound Email / API Request
+        ↓
+SendGrid Inbound Parse / HTTP API
+        ↓
+Cloud Function (simulate_inbound_email)
+        ↓
+RFQ Parsing and Risk Scoring
+        ↓
+Cloud Storage (GCS)
+        ↓
+BigQuery (RFQ Table)
+        ↓
+Decision Engine
+        ↓
+SendGrid (Outbound Email)
+
+
+Inbound Processing
+
+Entry Point
+	•	Cloud Function: simulate_inbound_email
+	•	Trigger: HTTP request or SendGrid inbound webhook
+
+Responsibilities
+	•	Extract RFQ ID from email subject
+	•	Parse supplier details from email body:
+	•	Supplier Name
+	•	Unit Price
+	•	Delivery Days
+	•	Validate input format
+	•	Support optional document reference via GCS URI
+
+
+Processing Layer
+
+RFQ Parsing
+
+Structured data is extracted from unstructured email content using regular expressions.
+
+Risk Scoring
+
+Risk is calculated based on pricing and delivery timelines:
+
+Condition	Score
+Unit Price > 150000	+30
+Unit Price < 80000	+25
+Delivery Days > 30	+40
+Delivery Days > 15	+20
+
+
+
+Storage Layer
+
+Cloud Storage (GCS)
+
+Bucket: supplier-onboarding-risk
+
+Stores:
+	•	RFQ payloads (JSON format)
+	•	Supplier documents (e.g., W-9 PDFs)
+
+Acts as the raw data storage layer.
+
+Data Layer
+
+BigQuery Tables
+
+RFQ Table
+Stores transactional procurement data:
+	•	rfq_id
+	•	supplier_id
+	•	supplier_name
+	•	unit_price
+	•	delivery_days
+	•	risk_score
+	•	quotation_gcs_uri
+	•	created_at
+
+W-9 Supplier Data (Planned)
+Future integration with Document AI will enable structured extraction of supplier data:
+	•	rfq_id
+	•	supplier_name
+	•	tax_id
+	•	address
+	•	document_gcs_uri
+	•	created_at
+
+Outbound Communication
+
+SendGrid Integration
+
+The system sends automated responses based on business logic:
+
+Scenario	Action
+High risk RFQ	Send negotiation email
+Acceptable RFQ	Send confirmation email
+Missing data	Request clarification
+
+Implementation
+	•	SendGrid API is used for transactional email delivery
+	•	API keys should be managed using environment variables or Secret Manager
+
+⸻
+
+End-to-End Flow
+
+Supplier Email / API Request
+        ↓
+Cloud Function (Inbound Processing)
+        ↓
+RFQ Parsing and Risk Evaluation
+        ↓
+Store in GCS and BigQuery
+        ↓
+Decision Engine
+        ↓
+SendGrid API (Outbound Email)
+
+
+Future Enhancements
+
+Document AI Integration
+	•	Process supplier documents from GCS
+	•	Extract structured fields such as tax ID, name, and address
+	•	Persist extracted data in BigQuery
+
+Event-Driven Architecture
+	•	Trigger processing using GCS events and Eventarc
+	•	Improve scalability and reliability
+
+
+Security Enhancements
+	•	Store secrets in Secret Manager
+	•	Enable CMEK for encryption
+	•	Mask sensitive fields such as tax identifiers
+
+
+Design Principles
+	•	Serverless architecture
+	•	Loose coupling between components
+	•	Separation of raw and structured data
+	•	Scalable and extensible design
+	•	Cloud-native implementation
+
+
+Use Cases
+	•	Supplier onboarding automation
+	•	Procurement risk evaluation
+	•	Document processing pipelines
+	•	ERP integration (e.g., SAP Ariba, S/4HANA extensions)
+
+Summary
+
+This project demonstrates a cloud-native approach to building a procurement automation system using:
+	•	Cloud Functions for compute
+	•	Cloud Storage for raw data
+	•	BigQuery for analytics
+	•	SendGrid for communication
+
+The architecture is designed to support future enhancements such as AI-driven document processing and event-driven 
