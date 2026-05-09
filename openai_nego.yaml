@@ -1,0 +1,69 @@
+openapi: 3.1.0
+info:
+  title: RFQ Negotiation Agent API
+  description: API for running RFQ negotiation and triggering supplier recommendation workflows
+  version: 1.0.0
+
+servers:
+  - url: https://us-central1-data-engineering-479617.cloudfunctions.net
+
+paths:
+  /negotiate_rfq:
+    post:
+      operationId: negotiateRFQ
+      summary: Run negotiation agent for an RFQ
+      description: Evaluates suppliers, calculates scores, and returns a recommended supplier along with email notification status.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                rfq_id:
+                  type: string
+                  example: RFQ-TEST-9004
+              required:
+                - rfq_id
+      responses:
+        "200":
+          description: Negotiation result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  rfq_id:
+                    type: string
+                  status:
+                    type: string
+                    example: NEGOTIATION_READY
+                  email_sent:
+                    type: boolean
+                  negotiation_result:
+                    type: object
+                    properties:
+                      recommended_supplier:
+                        type: string
+                      recommended_supplier_name:
+                        type: string
+                      approval_payload:
+                        type: object
+                        properties:
+                          rationale:
+                            type: string
+                          alternatives:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                supplier_name:
+                                  type: string
+                                unit_price:
+                                  type: number
+                                delivery_days:
+                                  type: number
+                                risk_score:
+                                  type: number
+                                score:
+                                  type: number
